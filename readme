@@ -1,0 +1,99 @@
+AI Retail Shelf Auditor
+
+Detect products on a retail shelf photo, group them into shelf rows, flag possible empty spaces, and (optionally) compare the counts against what should be on the shelf.
+
+It uses YOLO-World, an open-vocabulary detector, so you describe the products in words ("tube", "bottle", "product box") instead of needing a model trained on your exact items.
+
+Status: the notebooks have been syntax-checked but not benchmarked. Detection quality depends on your photos and your prompts. Tune PROMPTS, CONF and the row/gap factors on your own images before relying on the numbers.
+
+Why not a standard COCO model?
+
+A COCO-pretrained model (such as yolo11n.pt) only knows 80 everyday classes (person, car, bottle...). Products like insole boxes, foot-care tubes or blister packs are not among them, so it finds nothing. Open-vocabulary detection with text prompts fixes this without any training.
+
+How it works
+Load the shelf photo and upscale it if it is small.
+Detect products on overlapping tiles (so small items are not missed), then merge duplicates with NMS.
+Group detections into shelf rows using the bottom edge of each box.
+Find gaps: horizontal space between neighbours wider than a typical product is flagged as a possible empty spot.
+Audit (optional): compare detected counts with expected counts you provide.
+Save an annotated image and CSV reports.
+Notebooks
+File	Use when
+AI_retail_shelf_auditor_colab.ipynb	Google Colab, normal model (yolov8s-worldv2)
+AI_retail_shelf_auditor_colab_heavy.ipynb	Google Colab with a GPU, best accuracy (yolov8x-worldv2)
+AI_retail_shelf_auditor_lite.ipynb	Local Jupyter on a low-RAM PC, small settings
+AI_retail_shelf_auditor_clean.ipynb	Local Jupyter, full-size settings
+shelf_test.jpg	Synthetic test shelf (4 rows, 2 deliberate gaps)
+Quick start
+Google Colab (recommended)
+Open colab.research.google.com and choose File > Upload notebook.
+Optional but faster: Runtime > Change runtime type > T4 GPU.
+Run the cells top to bottom and upload your shelf photo when asked.
+The last cell downloads audit_results.zip.
+Local
+bash
+git clone <your-repo-url>
+cd <your-repo>
+python -m venv .venv
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+jupyter notebook
+
+Put your photo in an images/ folder next to the notebook (created automatically), then run the cells in order. The first run downloads the model weights and CLIP text model (a few hundred MB), so it needs internet.
+
+Configuration
+
+All settings are in one cell near the top of each notebook.
+
+Setting	Meaning
+IMAGE_NAME	Image to use. None uses the first image found / uploaded.
+MODEL_NAME	yolov8s-worldv2.pt (light) up to yolov8x-worldv2.pt (heavy).
+PROMPTS	Product types to look for, in plain words.
+TARGET_LONG_SIDE	Small photos are upscaled to this size before detection.
+TILE_SIZE, TILE_OVERLAP	Tiling for small, dense items.
+CONF	Confidence threshold. Low on purpose for dense shelves; raise it if there is too much noise.
+NMS_IOU	Overlap above which duplicate boxes are merged.
+MAX_BOX_FRACTION	Drops boxes larger than this share of the image (often a whole shelf section).
+ROW_GAP_FACTOR	Sensitivity for splitting items into shelf rows.
+EMPTY_GAP_FACTOR	How wide a space must be (in product widths) to count as a gap.
+Stock audit
+
+Provide what should be on the shelf. Colab notebooks use an EXPECTED = {...} dictionary; the local notebooks read expected_planogram.csv:
+
+csv
+Product_Class,Expected_Count
+product box,20
+tube,10
+
+Product_Class must match your PROMPTS. Rows left blank are skipped, so no numbers are invented. The status is Matches, Potential shortage or Over expected.
+
+Outputs
+File	Content
+audit_<time>.jpg	Annotated photo: labeled boxes, red rectangles for possible gaps
+detections_<time>.csv	One row per item: class, confidence, box, size, shelf row
+summary_<time>.csv	Count per product class
+gaps_<time>.csv	Possible empty spaces per shelf row
+stock_audit_<time>.csv	Expected vs observed counts
+Limitations
+Counts are by product type, not by brand or SKU. Telling specific products apart needs a model fine-tuned on your labeled photos, or a crop-and-match step against reference product images.
+Gap detection is a heuristic: it assumes products stand on the shelf and sit in horizontal rows. Check results visually.
+Heavily occluded, rotated or very small items may be missed or merged.
+Low-resolution photos limit accuracy, whatever the model.
+Troubleshooting
+Problem	Fix
+Ultralytics requirement ['git+https://github.com/ultralytics/CLIP.git'] not found	Install CLIP before running: pip install git+https://github.com/ultralytics/CLIP.git (needs Git), then restart the kernel.
+Jupyter kernel dies (Windows/Anaconda)	Use the lite notebook; it sets KMP_DUPLICATE_LIB_OK=TRUE, limits threads and uses smaller sizes.
+Out-of-memory on Colab	Use yolov8l-worldv2.pt or lower TILE_SIZE to 640.
+Nothing detected	Lower CONF, improve PROMPTS, or use a higher-resolution photo.
+Wrong class names on boxes	Names come from PROMPTS; reword them (for example "toothpaste tube" instead of "tube").
+Built with
+
+Ultralytics YOLO-World, OpenCV, pandas, Matplotlib, PyTorch.
+
+AI-Retail-Shelf-Auditor/
+├── AI_Retail_Shelf_Auditor.ipynb
+├── images/
+├── outputs/
+├── datasets/
+├── requirements.txt
+└── README.md
