@@ -1,0 +1,16 @@
+# Core
+ultralytics>=8.3.0
+torch>=2.0.0
+numpy
+pandas
+opencv-python
+matplotlib
+pillow
+
+# YOLO-World text prompts need OpenAI CLIP (Ultralytics fork).
+# Needs Git installed. No-git alternative: ftfy regex tqdm clip-anytorch
+git+https://github.com/ultralytics/CLIP.git
+
+# Only for running locally (Colab already has these)
+jupyter
+ipykernel
